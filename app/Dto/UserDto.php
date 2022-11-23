@@ -24,4 +24,8 @@ class UserDto {
     public static function fromSql($sqlObj): UserDto {
         return new UserDto($sqlObj->id, $sqlObj->username, $sqlObj->real_name, $sqlObj->role_id);
     }
+
+    public function isAdmin() {
+        return $this->role_id === 1;
+    }
 }
