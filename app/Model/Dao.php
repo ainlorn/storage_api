@@ -1,6 +1,8 @@
 <?php
 namespace App\Model;
 
+use Exception;
+
 class Dao {
     protected $connection = null;
 
