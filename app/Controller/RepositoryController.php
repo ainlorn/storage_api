@@ -15,9 +15,15 @@ use Slim\Http\Response as Response;
 
 class RepositoryController {
     function listRepos(Request $request, Response $response, $args) {
+        $user = $request->getAttribute("user");
         $dao = new RepositoryDao();
         $git = new Git();
-        $repos = $dao->getAllRepositories();
+
+        if ($user->isAdmin())
+            $repos = $dao->getAllRepositories();
+        else
+            $repos = $dao->getRepositoriesForUser($user->id);
+
         $dtos = array();
 
         foreach ($repos as $repo) {
