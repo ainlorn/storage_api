@@ -1,5 +1,6 @@
 <?php
 # переименовать в config.php
+const BASE_PATH = '/api';
 const DB_SERVER = 'ip, port';
 const DB_DATABASE = 'название базы данных';
 const DB_USER = 'имя пользователя бд';
