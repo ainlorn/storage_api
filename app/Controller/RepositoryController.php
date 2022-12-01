@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Dto\BaseResponse;
 use App\Dto\RepositoryDto;
 use App\Dto\RepositoryFileDto;
 use App\Dto\RepositoryListResponse;
@@ -96,5 +97,85 @@ class RepositoryController {
         }
 
         return $arr2;
+    }
+
+    function lockFile(Request $request, Response $response, $args) {
+        $user = $request->getAttribute("user");
+        $dao = new RepositoryDao();
+        $body = $request->getParsedBody();
+        $repoId = $body['repo_id'];
+        $filename = $body['filename'];
+
+        if ($repoId === null || $filename === null) {
+            return $response->withJson(new BaseResponse("Отсутствует параметр"), 400,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $repo = $dao->getRepositoryById(intval($repoId));
+        if ($repo === null) {
+            return $response->withJson(new BaseResponse("Репозиторий не найден"), 404,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($user->role_id !== 1 && !$dao->userHasAccessToRepository($user->id, $repo->id)) {
+            return $response->withJson(new BaseResponse("Нет доступа к репозиторию"), 403,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($dao->isFileLocked($repoId, $filename)) {
+            return $response->withJson(new BaseResponse("Файл уже захвачен"), 403,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $git = new Git();
+        $gitRepo = $git->open($repo->path);
+        $fileList = $gitRepo->listFiles();
+        if (!in_array($filename, $fileList)) {
+            return $response->withJson(new BaseResponse("Файл не найден"), 404,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $dao->createLock($repo->id, $filename, $user->id);
+
+        return $response->withJson(new BaseResponse(null), 200, JSON_UNESCAPED_UNICODE);
+    }
+
+    function unlockFile(Request $request, Response $response, $args) {
+        $user = $request->getAttribute("user");
+        $dao = new RepositoryDao();
+        $body = $request->getParsedBody();
+        $repoId = $body['repo_id'];
+        $filename = $body['filename'];
+
+        if ($repoId === null || $filename === null) {
+            return $response->withJson(new BaseResponse("Отсутствует параметр"), 400,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $repo = $dao->getRepositoryById(intval($repoId));
+        if ($repo === null) {
+            return $response->withJson(new BaseResponse("Репозиторий не найден"), 404,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($user->role_id !== 1 && !$dao->userHasAccessToRepository($user->id, $repo->id)) {
+            return $response->withJson(new BaseResponse("Нет доступа к репозиторию"), 403,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $lock = $dao->getLockByFilename($repo->id, $filename);
+        if ($lock === null) {
+            return $response->withJson(new BaseResponse("Файл не захвачен"), 400,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($user->role_id !== 1 && $lock->user_id !== $user->id) {
+            return $response->withJson(new BaseResponse("Файл захвачен другим пользователем"), 403,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $dao->removeLock($repo->id, $filename);
+
+        return $response->withJson(new BaseResponse(null), 200, JSON_UNESCAPED_UNICODE);
     }
 }

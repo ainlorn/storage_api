@@ -31,6 +31,8 @@ $app->post('/login', AuthController::class);
 // Authorized
 $app->group('', function (\Slim\Routing\RouteCollectorProxy $group) {
     $group->get('/repositories/list', RepositoryController::class . ':listRepos');
+    $group->post('/repositories/lock', RepositoryController::class . ':lockFile');
+    $group->post('/repositories/unlock', RepositoryController::class . ':unlockFile');
 })->add(new AuthMiddleware());
 
 $app->run();
