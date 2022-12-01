@@ -13,6 +13,7 @@ use App\Model\RepositoryDao;
 use CzProject\GitPhp\Exception;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Http\Response as Response;
+use Slim\Psr7\Stream as Stream;
 
 class RepositoryController {
     function listRepos(Request $request, Response $response, $args) {
@@ -177,5 +178,47 @@ class RepositoryController {
         $dao->removeLock($repo->id, $filename);
 
         return $response->withJson(new BaseResponse(null), 200, JSON_UNESCAPED_UNICODE);
+    }
+
+    function downloadFile(Request $request, Response $response, $args) {
+        $user = $request->getAttribute("user");
+        $dao = new RepositoryDao();
+        $params = $request->getQueryParams();
+        $repoId = $params['repo_id'] ?? null;
+        $filename = $params['filename'] ?? null;
+
+        if ($repoId === null || $filename === null) {
+            return $response->withJson(new BaseResponse("Отсутствует параметр"), 400,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $repo = $dao->getRepositoryById(intval($repoId));
+        if ($repo === null) {
+            return $response->withJson(new BaseResponse("Репозиторий не найден"), 404,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($user->role_id !== 1 && !$dao->userHasAccessToRepository($user->id, $repo->id)) {
+            return $response->withJson(new BaseResponse("Нет доступа к репозиторию"), 403,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $git = new Git();
+        $gitRepo = $git->open($repo->path);
+        $fileList = $gitRepo->listFiles();
+        if (!in_array($filename, $fileList)) {
+            return $response->withJson(new BaseResponse("Файл не найден"), 404,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $path = REPOS_PATH . '/' . $repo->path . '/' . $filename;
+        $fh = fopen($path, 'rb');
+        $stream = new Stream($fh);
+        $path_split = explode('/', $filename);
+
+        return $response
+            ->withHeader('Content-Type', 'application/octet-stream')
+            ->withHeader('Content-Disposition', 'attachment; filename="'. end($path_split) . '"')
+            ->withBody($stream);
     }
 }
