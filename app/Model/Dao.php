@@ -45,6 +45,13 @@ class Dao {
         }
     }
 
+    public function selectOne($query = "", $params = []) {
+        $result = $this->select($query, $params);
+        if (count($result) !== 1)
+            return null;
+        return $result[0];
+    }
+
     private function executeStatement($query = "", $params = []) {
         try {
             $stmt = sqlsrv_prepare($this->connection, $query, $params);
