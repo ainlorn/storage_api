@@ -2,6 +2,7 @@
 namespace App;
 
 use CzProject\GitPhp\Git as OriginalGit;
+use CzProject\GitPhp\GitException;
 use CzProject\GitPhp\GitRepository as OriginalRepository;
 
 class Git extends OriginalGit {
@@ -26,5 +27,24 @@ class GitRepository extends OriginalRepository {
                 $value = substr($value, 1, strlen($value) - 2);
             return $value;
         });
+    }
+
+    public function addNote($message) {
+        $this->run('notes', 'add', [
+            '-m' => $message,
+        ]);
+        return $this;
+    }
+
+    protected function run(...$args)
+    {
+        $result = $this->runner->run($this->repository, $args);
+
+        if (!$result->isOk()) {
+            $res_txt = var_export($result, true);
+            throw new GitException("Command '{$result->getCommand()}' failed (exit-code {$result->getExitCode()}).\n $res_txt", $result->getExitCode(), NULL, $result);
+        }
+
+        return $result;
     }
 }

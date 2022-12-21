@@ -8,6 +8,8 @@ use App\Middleware\AuthMiddleware;
 require __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../config.php';
 
+setlocale(LC_CTYPE, "en_US.UTF-8");
+
 $app = AppFactory::create();
 $app->setBasePath(BASE_PATH);
 
@@ -34,6 +36,7 @@ $app->group('', function (\Slim\Routing\RouteCollectorProxy $group) {
     $group->post('/repositories/lock', RepositoryController::class . ':lockFile');
     $group->post('/repositories/unlock', RepositoryController::class . ':unlockFile');
     $group->get('/repositories/downloadFile', RepositoryController::class . ':downloadFile');
+    $group->post('/repositories/pushFile', RepositoryController::class . ':pushFile');
 })->add(new AuthMiddleware());
 
 $app->run();

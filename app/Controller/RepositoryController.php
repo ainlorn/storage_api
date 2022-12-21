@@ -221,4 +221,64 @@ class RepositoryController {
             ->withHeader('Content-Disposition', 'attachment; filename="'. end($path_split) . '"')
             ->withBody($stream);
     }
+
+    function pushFile(Request $request, Response $response, $args) {
+        $user = $request->getAttribute("user");
+        $dao = new RepositoryDao();
+        $body = $request->getParsedBody();
+        $repoId = $body['repo_id'];
+        $filename = html_entity_decode($body['filename']);
+        $commitMessage = html_entity_decode($body['commit_message'] ?? ' ');
+
+        if ($repoId === null || $filename === null) {
+            return $response->withJson(new BaseResponse("Отсутствует параметр"), 400,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $uploadedFiles = $request->getUploadedFiles();
+        $uploadedFile = $uploadedFiles['file'];
+        if ($uploadedFile == null || is_array($uploadedFile) || $uploadedFile->getError() !== UPLOAD_ERR_OK) {
+            return $response->withJson(new BaseResponse("Отсутствует загруженный файл"), 400,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $repo = $dao->getRepositoryById(intval($repoId));
+        if ($repo === null) {
+            return $response->withJson(new BaseResponse("Репозиторий не найден"), 404,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($user->role_id !== 1 && !$dao->userHasAccessToRepository($user->id, $repo->id)) {
+            return $response->withJson(new BaseResponse("Нет доступа к репозиторию"), 403,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $lock = $dao->getLockByFilename($repo->id, $filename);
+        if ($lock === null) {
+            return $response->withJson(new BaseResponse("Файл не захвачен"), 400,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($lock->user_id !== $user->id) {
+            return $response->withJson(new BaseResponse("Файл захвачен другим пользователем"), 403,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $git = new Git();
+        $gitRepo = $git->open($repo->path);
+        $uploadedFile->moveTo($gitRepo->getRepositoryPath() . DIRECTORY_SEPARATOR . $filename);
+
+        if (!$gitRepo->hasChanges()) {
+            return $response->withJson(new BaseResponse("Файл идентичен предыдущей версии"), 400,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $gitRepo->addFile($filename);
+        $gitRepo->commit($commitMessage);
+        $gitRepo->addNote('Author: ' . $user->username);
+
+        $dao->removeLock($repo->id, $filename);
+
+        return $response->withJson(new BaseResponse(null), 200);
+    }
 }
