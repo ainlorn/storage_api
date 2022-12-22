@@ -5,18 +5,18 @@ namespace App\Dto;
 class RepositoryFileDto {
     public string $name;
     public string $type;
-    public bool $lock;
-    public ?string $user;
+    public ?RepositoryLockDto $lock;
+    public CommitInfoShortDto $last_commit;
 
     /**
      * @param string $name
-     * @param bool $lock
-     * @param string|null $user
+     * @param RepositoryLockDto|null $lock
+     * @param CommitInfoShortDto $last_commit
      */
-    public function __construct(string $name, bool $lock, ?string $user) {
+    public function __construct(string $name, ?RepositoryLockDto $lock, CommitInfoShortDto $last_commit) {
         $this->name = $name;
-        $this->lock = $lock;
         $this->type = "file";
-        $this->user = $user;
+        $this->lock = $lock;
+        $this->last_commit = $last_commit;
     }
 }

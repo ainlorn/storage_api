@@ -3,10 +3,12 @@
 namespace App\Controller;
 
 use App\Dto\BaseResponse;
+use App\Dto\CommitInfoShortDto;
 use App\Dto\RepositoryDto;
 use App\Dto\RepositoryFileDto;
 use App\Dto\RepositoryListResponse;
 use App\Dto\RepositoryFolderDto;
+use App\Dto\RepositoryLockDto;
 use App\Dto\UserDto;
 use App\Git;
 use App\Model\RepositoryDao;
@@ -65,16 +67,21 @@ class RepositoryController {
                         throw new Exception("File tree parsing error");
                     }
                     $currentFolder = $currentFolder->files[$subFolder];
-                }
+                } // находим текущую папку
 
-                $locked = false;
-                $user = null;
+                $commitData = $gitRepo->getLastCommitDataForFile($file);
+                $commitDto = new CommitInfoShortDto($commitData['id'], $commitData['timestamp'],
+                    $commitData['message'], $commitData['author']);
+
+                $lock = null;
                 if (array_key_exists($file, $locksMap)) {
-                    $locked = true;
-                    $user = $locksMap[$file]->username;
+                    $lock = new RepositoryLockDto(
+                        $locksMap[$file]->username,
+                        $locksMap[$file]->created_on->getTimestamp()
+                    );
                 }
 
-                $currentFolder->files[$filename] = new RepositoryFileDto($filename, $locked, $user);
+                $currentFolder->files[$filename] = new RepositoryFileDto($filename, $lock, $commitDto);
             }
 
             $dtos[] = new RepositoryDto($repo->id, $repo->name,
