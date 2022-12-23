@@ -13,6 +13,7 @@ use App\Dto\UserDto;
 use App\Git;
 use App\Model\RepositoryDao;
 use CzProject\GitPhp\Exception;
+use CzProject\GitPhp\GitException;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Http\Response as Response;
 use Slim\Psr7\Stream as Stream;
@@ -193,6 +194,7 @@ class RepositoryController {
         $params = $request->getQueryParams();
         $repoId = $params['repo_id'] ?? null;
         $filename = $params['filename'] ?? null;
+        $version = $params['version'] ?? 'HEAD';
 
         if ($repoId === null || $filename === null) {
             return $response->withJson(new BaseResponse("Отсутствует параметр"), 400,
@@ -212,15 +214,24 @@ class RepositoryController {
 
         $git = new Git();
         $gitRepo = $git->open($repo->path);
-        $fileList = $gitRepo->listFiles();
-        if (!in_array($filename, $fileList)) {
+//        $fileList = $gitRepo->listFiles();
+//        if (!in_array($filename, $fileList)) {
+//            return $response->withJson(new BaseResponse("Файл не найден"), 404,
+//                JSON_UNESCAPED_UNICODE);
+//        }
+
+//        $path = REPOS_PATH . '/' . $repo->path . '/' . $filename;
+//        $fh = fopen($path, 'rb');
+//        $stream = new Stream($fh);
+
+        try {
+            $objId = $gitRepo->getObjectId($version, $filename);
+        } catch (GitException $e) {
             return $response->withJson(new BaseResponse("Файл не найден"), 404,
                 JSON_UNESCAPED_UNICODE);
         }
 
-        $path = REPOS_PATH . '/' . $repo->path . '/' . $filename;
-        $fh = fopen($path, 'rb');
-        $stream = new Stream($fh);
+        $stream = new Stream($gitRepo->getBlobStream($objId));
         $path_split = explode('/', $filename);
 
         return $response

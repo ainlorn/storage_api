@@ -57,6 +57,64 @@ class GitRepository extends OriginalRepository {
         ];
     }
 
+    public function getObjectId($rev, $filename) {
+        return $this->run('rev-parse', '--verify', "$rev:$filename")->getOutputAsString();
+    }
+
+    public function getBlobStream($objId) {
+        $descriptorspec = [
+            0 => ['pipe', 'r'], // stdin
+            1 => ['pipe', 'w'], // stdout
+            2 => ['pipe', 'w'], // stderr
+        ];
+
+        $pipes = [];
+        $process = proc_open("git show $objId", $descriptorspec, $pipes, $this->getRepositoryPath(), NULL, [
+            'bypass_shell' => TRUE,
+        ]);
+
+        if (!$process) {
+            throw new GitException("Executing of git show failed.");
+        }
+
+        // Reset output and error
+        stream_set_blocking($pipes[1], FALSE);
+        stream_set_blocking($pipes[2], FALSE);
+
+        $stderr = '';
+        $resource = fopen('php://temp', 'rw+');
+
+        while (TRUE) {
+            // Read standard output
+            $stdoutOutput = stream_get_contents($pipes[1], 2 * 1024 * 1024);
+
+            if (is_string($stdoutOutput)) {
+                fwrite($resource, $stdoutOutput);
+            }
+
+            // Read error output
+            $stderrOutput = stream_get_contents($pipes[2]);
+
+            if (is_string($stderrOutput)) {
+                $stderr .= $stderrOutput;
+            }
+
+            // We are done
+            if ((feof($pipes[1]) || $stdoutOutput === FALSE) && (feof($pipes[2]) || $stderrOutput === FALSE)) {
+                break;
+            }
+        }
+
+        $returnCode = proc_close($process);
+
+        if ($returnCode != 0) {
+            throw new GitException("git show failed with code $returnCode. $stderr");
+        }
+
+        rewind($resource);
+        return $resource;
+    }
+
     protected function run(...$args) {
         $result = $this->runner->run($this->repository, $args);
 
