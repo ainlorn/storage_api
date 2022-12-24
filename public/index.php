@@ -37,6 +37,7 @@ $app->group('', function (\Slim\Routing\RouteCollectorProxy $group) {
     $group->post('/repositories/unlock', RepositoryController::class . ':unlockFile');
     $group->get('/repositories/downloadFile', RepositoryController::class . ':downloadFile');
     $group->post('/repositories/pushFile', RepositoryController::class . ':pushFile');
+    $group->get('/repositories/commitHistory', RepositoryController::class . ':getCommitHistoryForFile');
 })->add(new AuthMiddleware());
 
 $app->run();

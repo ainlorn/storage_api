@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Dto\BaseResponse;
+use App\Dto\CommitHistoryResponse;
 use App\Dto\CommitInfoShortDto;
 use App\Dto\RepositoryDto;
 use App\Dto\RepositoryFileDto;
@@ -70,7 +71,7 @@ class RepositoryController {
                     $currentFolder = $currentFolder->files[$subFolder];
                 } // находим текущую папку
 
-                $commitData = $gitRepo->getLastCommitDataForFile($file);
+                $commitData = $gitRepo->getLastCommitForFile($file);
                 $commitDto = new CommitInfoShortDto($commitData['id'], $commitData['timestamp'],
                     $commitData['message'], $commitData['author']);
 
@@ -236,8 +237,48 @@ class RepositoryController {
 
         return $response
             ->withHeader('Content-Type', 'application/octet-stream')
-            ->withHeader('Content-Disposition', 'attachment; filename="'. end($path_split) . '"')
+            ->withHeader('Content-Disposition', 'attachment; filename="' . end($path_split) . '"')
             ->withBody($stream);
+    }
+
+    function getCommitHistoryForFile(Request $request, Response $response, $args) {
+        $user = $request->getAttribute("user");
+        $dao = new RepositoryDao();
+        $params = $request->getQueryParams();
+        $repoId = $params['repo_id'] ?? null;
+        $filename = $params['filename'] ?? null;
+
+        if ($repoId === null || $filename === null) {
+            return $response->withJson(new BaseResponse("Отсутствует параметр"), 400,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $repo = $dao->getRepositoryById(intval($repoId));
+        if ($repo === null) {
+            return $response->withJson(new BaseResponse("Репозиторий не найден"), 404,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($user->role_id !== 1 && !$dao->userHasAccessToRepository($user->id, $repo->id)) {
+            return $response->withJson(new BaseResponse("Нет доступа к репозиторию"), 403,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $git = new Git();
+        $gitRepo = $git->open($repo->path);
+        $fileList = $gitRepo->listFiles();
+        if (!in_array($filename, $fileList)) {
+            return $response->withJson(new BaseResponse("Файл не найден"), 404,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $commits = $gitRepo->getAllCommitsForFile($filename);
+        $dtos = [];
+        foreach ($commits as $commit) {
+            $dtos[] = new CommitInfoShortDto($commit['id'], $commit['timestamp'], $commit['message'], $commit['author']);
+        }
+
+        return $response->withJson(new CommitHistoryResponse($dtos), 200, JSON_UNESCAPED_UNICODE);
     }
 
     function pushFile(Request $request, Response $response, $args) {

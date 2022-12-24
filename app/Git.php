@@ -37,11 +37,8 @@ class GitRepository extends OriginalRepository {
         return $this;
     }
 
-    public function getLastCommitDataForFile($filename) {
-        $output = $this->run(
-            'log', '--pretty=format:%H^^^^%n%at^^^^%n%s^^^^%n%N%nend', '-n', '1', $filename
-        )->getOutputAsString();
-        $arr = explode("^^^^\n", $output);
+    protected function extractCommitData($str) {
+        $arr = explode("^^^^\n", $str);
         $notes = explode("\n", $arr[3]);
         $notesMap = [];
         foreach ($notes as $note) {
@@ -55,6 +52,29 @@ class GitRepository extends OriginalRepository {
             'message' => $arr[2],
             'author' => $notesMap['Author'] ?? null
         ];
+    }
+
+    public function getLastCommitForFile($filename) {
+        $output = $this->run(
+            'log', '--pretty=format:%H^^^^%n%at^^^^%n%s^^^^%n%N%nend', '-n', '1', $filename
+        )->getOutputAsString();
+        return $this->extractCommitData($output);
+    }
+
+    public function getAllCommitsForFile($filename) {
+        $output = $this->run(
+            'log', '--pretty=format:%H^^^^%n%at^^^^%n%s^^^^%n%N%nend^^^^', $filename
+        )->getOutputAsString();
+        $commits = explode("\nend^^^^\n", $output);
+        $result = [];
+
+        foreach ($commits as $commit) {
+            if (strlen($commit) === 0)
+                continue;
+            $result[] = $this->extractCommitData($commit);
+        }
+
+        return $result;
     }
 
     public function getObjectId($rev, $filename) {
