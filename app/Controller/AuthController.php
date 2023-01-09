@@ -27,7 +27,7 @@ class AuthController {
             if (password_verify($password, $user->password_hash)) {
                 $sessionDao = new SessionDao();
                 $sid = $sessionDao->createSession($user->id);
-                setcookie("sid", $sid, time() + 2592000, BASE_PATH);
+                setcookie("sid", $sid, ['expires' => time() + 2592000, 'path' => '/']);
                 return $response->withJson(new AuthResponse(UserDto::fromSql($user), $sid));
             }
         }
