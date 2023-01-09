@@ -287,7 +287,12 @@ class RepositoryController {
         $body = $request->getParsedBody();
         $repoId = $body['repo_id'];
         $filename = html_entity_decode($body['filename']);
-        $commitMessage = html_entity_decode($body['commit_message'] ?? ' ');
+        $commitMessage = html_entity_decode($body['commit_message']);
+        if (strlen($commitMessage) == 0) {
+            $commitMessage = '(без сообщения)';
+        }
+
+        $newFile = $body['new'] == '1';
 
         if ($repoId === null || $filename === null) {
             return $response->withJson(new BaseResponse("Отсутствует параметр"), 400,
@@ -312,15 +317,21 @@ class RepositoryController {
                 JSON_UNESCAPED_UNICODE);
         }
 
-        $lock = $dao->getLockByFilename($repo->id, $filename);
-        if ($lock === null) {
-            return $response->withJson(new BaseResponse("Файл не захвачен"), 400,
-                JSON_UNESCAPED_UNICODE);
-        }
+        if (!$newFile) {
+            $lock = $dao->getLockByFilename($repo->id, $filename);
+            if ($lock === null) {
+                return $response->withJson(new BaseResponse("Файл не захвачен"), 400,
+                    JSON_UNESCAPED_UNICODE);
+            }
 
-        if ($lock->user_id !== $user->id) {
-            return $response->withJson(new BaseResponse("Файл захвачен другим пользователем"), 403,
-                JSON_UNESCAPED_UNICODE);
+            if ($lock->user_id !== $user->id) {
+                return $response->withJson(new BaseResponse("Файл захвачен другим пользователем"), 403,
+                    JSON_UNESCAPED_UNICODE);
+            }
+        } else {
+            if (is_file(REPOS_PATH . DIRECTORY_SEPARATOR . $repo->path . DIRECTORY_SEPARATOR . $filename)) {
+                return $response->withJson(new BaseResponse("Файл существует"), 400, JSON_UNESCAPED_UNICODE);
+            }
         }
 
         $git = new Git();
@@ -336,7 +347,8 @@ class RepositoryController {
         $gitRepo->commit($commitMessage);
         $gitRepo->addNote('Author: ' . $user->username);
 
-        $dao->removeLock($repo->id, $filename);
+        if (!$newFile)
+            $dao->removeLock($repo->id, $filename);
 
         return $response->withJson(new BaseResponse(null), 200);
     }
@@ -365,6 +377,10 @@ class RepositoryController {
         $gitRepo->config('core.quotepath', 'off');
         $gitRepo->config('user.email', GIT_EMAIL);
         $gitRepo->config('user.name', GIT_NAME);
+        touch($gitRepo->getRepositoryPath() . DIRECTORY_SEPARATOR . '.gitkeep');
+        $gitRepo->addFile('.gitkeep');
+        $gitRepo->commit('Создан репозиторий');
+        $gitRepo->addNote('Author: ' . $user->username);
 
         $dao->createRepository($name, $path);
 
