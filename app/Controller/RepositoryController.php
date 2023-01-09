@@ -33,7 +33,7 @@ class RepositoryController {
         $dtos = array();
 
         foreach ($repos as $repo) {
-            $gitRepo = $git->open($repo->path);
+            $gitRepo = $git->openRepo($repo->path);
 
             $folders = $gitRepo->listFolders();
             $tree = new RepositoryFolderDto("/", array());
@@ -138,7 +138,7 @@ class RepositoryController {
         }
 
         $git = new Git();
-        $gitRepo = $git->open($repo->path);
+        $gitRepo = $git->openRepo($repo->path);
         $fileList = $gitRepo->listFiles();
         if (!in_array($filename, $fileList)) {
             return $response->withJson(new BaseResponse("Файл не найден"), 404,
@@ -214,7 +214,7 @@ class RepositoryController {
         }
 
         $git = new Git();
-        $gitRepo = $git->open($repo->path);
+        $gitRepo = $git->openRepo($repo->path);
 //        $fileList = $gitRepo->listFiles();
 //        if (!in_array($filename, $fileList)) {
 //            return $response->withJson(new BaseResponse("Файл не найден"), 404,
@@ -265,7 +265,7 @@ class RepositoryController {
         }
 
         $git = new Git();
-        $gitRepo = $git->open($repo->path);
+        $gitRepo = $git->openRepo($repo->path);
         $fileList = $gitRepo->listFiles();
         if (!in_array($filename, $fileList)) {
             return $response->withJson(new BaseResponse("Файл не найден"), 404,
@@ -324,7 +324,7 @@ class RepositoryController {
         }
 
         $git = new Git();
-        $gitRepo = $git->open($repo->path);
+        $gitRepo = $git->openRepo($repo->path);
         $uploadedFile->moveTo($gitRepo->getRepositoryPath() . DIRECTORY_SEPARATOR . $filename);
 
         if (!$gitRepo->hasChanges()) {
@@ -339,5 +339,35 @@ class RepositoryController {
         $dao->removeLock($repo->id, $filename);
 
         return $response->withJson(new BaseResponse(null), 200);
+    }
+
+    public function createRepository(Request $request, Response $response, $args) {
+        $user = $request->getAttribute("user");
+        $dao = new RepositoryDao();
+        $params = $request->getQueryParams();
+        $name = $params['name'] ?? null;
+        $path = $params['folder_name'] ?? null;
+
+        if ($user->role_id !== 1) {
+            return $response->withJson(new BaseResponse("Нет прав на создание репозитория"), 403, JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($name == null || $path == null) {
+            return $response->withJson(new BaseResponse("Отсутствует параметр"), 400, JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($dao->getRepositoryByPath($path) != null) {
+            return $response->withJson(new BaseResponse("Репозиторий уже существует"), 400, JSON_UNESCAPED_UNICODE);
+        }
+
+        $git = new Git();
+        $gitRepo = $git->init($path);
+        $gitRepo->config('core.quotepath', 'off');
+        $gitRepo->config('user.email', GIT_EMAIL);
+        $gitRepo->config('user.name', GIT_NAME);
+
+        $dao->createRepository($name, $path);
+
+        return $response->withJson(new BaseResponse(null), 200, JSON_UNESCAPED_UNICODE);
     }
 }

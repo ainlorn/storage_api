@@ -6,3 +6,5 @@ const DB_DATABASE = 'название базы данных';
 const DB_USER = 'имя пользователя бд';
 const DB_PASSWORD = 'пароль пользователя бд';
 const REPOS_PATH = 'путь к папке с репозиториями';
+const GIT_EMAIL = 'test@example.com';
+const GIT_NAME = 'User';

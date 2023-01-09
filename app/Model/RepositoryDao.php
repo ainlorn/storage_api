@@ -56,4 +56,12 @@ class RepositoryDao extends Dao {
     public function removeLock(int $repoId, string $filename) {
         $this->select("DELETE FROM repository_locks WHERE repo_id=? AND filename=?", [$repoId, $filename]);
     }
+
+    public function getRepositoryByPath(string $path) {
+        return $this->selectOne("SELECT * FROM repositories WHERE path=?", [$path]);
+    }
+
+    public function createRepository(string $name, string $path) {
+        $this->select("INSERT INTO repositories(name, path) VALUES (?, ?)", [$name, $path]);
+    }
 }

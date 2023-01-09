@@ -8,9 +8,15 @@ use CzProject\GitPhp\GitException;
 use CzProject\GitPhp\GitRepository as OriginalRepository;
 
 class Git extends OriginalGit {
-    public function open($directory) {
+    public function openRepo($directory) {
         return new GitRepository(REPOS_PATH . '/' . $directory, $this->runner);
     }
+
+    public function init($directory, array $params = NULL) {
+        parent::init(REPOS_PATH . '/' . $directory, $params);
+        return new GitRepository(REPOS_PATH . '/' . $directory, $this->runner);
+    }
+
 }
 
 class GitRepository extends OriginalRepository {
@@ -75,6 +81,11 @@ class GitRepository extends OriginalRepository {
         }
 
         return $result;
+    }
+
+    public function config($key, $value) {
+        $this->run('config', $key, $value);
+        return $this;
     }
 
     public function getObjectId($rev, $filename) {
