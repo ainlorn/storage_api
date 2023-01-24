@@ -429,4 +429,73 @@ class RepositoryController {
 
         return $response->withJson(new BaseResponse(null), 200);
     }
+
+    public function removeFile(Request $request, Response $response, $args) {
+        $user = $request->getAttribute("user");
+        $dao = new RepositoryDao();
+        $params = $request->getQueryParams();
+        $repoId = $params['repo_id'];
+        $path = $params['path'] ?? null;
+
+        if ($path == null || $repoId == null) {
+            return $response->withJson(new BaseResponse("Отсутствует параметр"), 400, JSON_UNESCAPED_UNICODE);
+        }
+
+        $path = str_replace('\\', '/', $path);
+        if ($path === '..' || str_contains($path, '../') || str_contains($path, '/..')) {
+            return $response->withJson(new BaseResponse("Некорректный путь"), 400, JSON_UNESCAPED_UNICODE);
+        }
+
+        $repo = $dao->getRepositoryById(intval($repoId));
+        if ($repo === null) {
+            return $response->withJson(new BaseResponse("Репозиторий не найден"), 404,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($user->role_id !== 1 && !$dao->userHasAccessToRepository($user->id, $repo->id)) {
+            return $response->withJson(new BaseResponse("Нет доступа к репозиторию"), 403,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $git = new Git();
+        $gitRepo = $git->openRepo($repo->path);
+
+        $fullPath = $gitRepo->getRepositoryPath() . DIRECTORY_SEPARATOR . $path;
+        if (!file_exists($fullPath)) {
+            return $response->withJson(new BaseResponse("Файл не существует"), 404,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $gitRepo->removeFile($path);
+        $gitRepo->commit("Удалено '$path'");
+        $gitRepo->addNote('Author: ' . $user->username);
+
+        return $response->withJson(new BaseResponse(null), 200);
+    }
+
+    public function removeRepository(Request $request, Response $response, $args) {
+        $user = $request->getAttribute("user");
+        $dao = new RepositoryDao();
+        $params = $request->getQueryParams();
+        $repoId = $params['repo_id'];
+
+        if ($repoId == null) {
+            return $response->withJson(new BaseResponse("Отсутствует параметр"), 400, JSON_UNESCAPED_UNICODE);
+        }
+
+        $repo = $dao->getRepositoryById(intval($repoId));
+        if ($repo === null) {
+            return $response->withJson(new BaseResponse("Репозиторий не найден"), 404,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($user->role_id !== 1 && !$dao->userHasAccessToRepository($user->id, $repo->id)) {
+            return $response->withJson(new BaseResponse("Нет доступа к репозиторию"), 403,
+                JSON_UNESCAPED_UNICODE);
+        }
+
+        $dao->removeRepository($repoId);
+
+        return $response->withJson(new BaseResponse(null), 200);
+    }
 }

@@ -40,6 +40,8 @@ $app->group('', function (\Slim\Routing\RouteCollectorProxy $group) {
     $group->get('/repositories/commitHistory', RepositoryController::class . ':getCommitHistoryForFile');
     $group->get('/repositories/createRepository', RepositoryController::class . ':createRepository');
     $group->get('/repositories/createFolder', RepositoryController::class . ':createFolder');
+    $group->get('/repositories/removeFile', RepositoryController::class . ':removeFile');
+    $group->get('/repositories/removeRepository', RepositoryController::class . ':removeRepository');
 })->add(new AuthMiddleware());
 
 $app->run();

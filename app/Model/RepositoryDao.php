@@ -64,4 +64,8 @@ class RepositoryDao extends Dao {
     public function createRepository(string $name, string $path) {
         $this->select("INSERT INTO repositories(name, path) VALUES (?, ?)", [$name, $path]);
     }
+
+    public function removeRepository(int $repoId) {
+        $this->select("DELETE FROM repositories WHERE id=?", [$repoId]);
+    }
 }
